@@ -1,4 +1,4 @@
-require("dotenv").config();
+require('dotenv').config()
 const fs = require('fs')
 const path = require('path')
 const express = require('express')
@@ -99,7 +99,7 @@ async function getModulesDefinitions(
  */
 async function checkVersion() {
   return new Promise((resolve) => {
-    exec('npm info NeteaseCloudMusicApi version', (err, stdout) => {
+    exec('npm info NeteaseCloudMusicApiEnhanced version', (err, stdout) => {
       if (!err) {
         let version = stdout.trim()
 
@@ -208,7 +208,9 @@ async function consturctServer(moduleDefs) {
     // Register the route.
     app.use(moduleDef.route, async (req, res) => {
       ;[req.query, req.body].forEach((item) => {
-        if (typeof item.cookie === 'string') {
+        // item may be undefined (some environments / middlewares).
+        // Guard access to avoid "Cannot read properties of undefined (reading 'cookie')".
+        if (item && typeof item.cookie === 'string') {
           item.cookie = cookieToJson(decode(item.cookie))
         }
       })
@@ -246,20 +248,28 @@ async function consturctServer(moduleDefs) {
           (req.baseUrl === '/song/url/v1' || req.baseUrl === '/song/url') &&
           process.env.ENABLE_GENERAL_UNBLOCK === 'true'
         ) {
-          const song = moduleResponse['body']['data'][0]
-            if (song.freeTrialInfo !== null || !song.url || [1, 4].includes(song.fee)) {
-              const match = require('@unblockneteasemusic/server')
-              const source = process.env.UNBLOCK_SOURCE ? process.env.UNBLOCK_SOURCE.split(',') : ['pyncmd', 'bodian', 'kuwo', 'qq', 'migu', 'kugou']
-              logger.info("开始解灰", source)
-              const { url } = await match(req.query.id, source)
-              song.url = url
-              song.freeTrialInfo = 'null'
-              logger.info("解灰成功!")
+          const song = moduleResponse.body.data[0]
+          if (
+            song.freeTrialInfo !== null ||
+            !song.url ||
+            [1, 4].includes(song.fee)
+          ) {
+            const match = require('@unblockneteasemusic/server')
+            const source = process.env.UNBLOCK_SOURCE
+              ? process.env.UNBLOCK_SOURCE.split(',')
+              : ['pyncmd', 'bodian', 'kuwo', 'qq', 'migu', 'kugou']
+            logger.info('开始解灰', source)
+            const { url } = await match(req.query.id, source)
+            song.url = url
+            song.freeTrialInfo = 'null'
+            logger.info('解灰成功!')
           }
-          if (song.url.includes('kuwo')) {
-            const proxy = process.env.PROXY_URL;
+          if (song.url && song.url.includes('kuwo')) {
+            const proxy = process.env.PROXY_URL
             const useProxy = process.env.ENABLE_PROXY || 'false'
-            if (useProxy === 'true' && proxy) {song.proxyUrl = proxy + song.url}
+            if (useProxy === 'true' && proxy) {
+              song.proxyUrl = proxy + song.url
+            }
           }
         }
 
@@ -336,17 +346,17 @@ async function serveNcmApi(options) {
   const appExt = app
   appExt.server = app.listen(port, host, () => {
     console.log(`
-   _   _  _____ __  __           _    ____ ___ 
-  | \\ | |/ ____|  \\/  |     /\\   | |  |  _ \\_ |
-  |  \\| | |    | \\  / |    /  \\  | |  | |_) | |
-  | . \` | |    | |\\/| |   / /\\ \\ | |  |  __/| |
-  | |\\  | |____| |  | |  / ____ \\| |__| |   | |
-  |_| \\_|\\_____|_|  |_| /_/    \\_\\____|_|   |_|
+   _   _  _____ __  __  
+  | \\ | |/ ____|  \\/  |
+  |  \\| | |    | \\  / |
+  | . \` | |    | |\\/| |
+  | |\\  | |____| |  | | 
+  |_| \\_|\\_____|_|  |_|
     `)
     console.log(`
     ╔═╗╔═╗╦    ╔═╗╔╗╔╦ ╦╔═╗╔╗╔╔═╗╔═╗╔╦╗
     ╠═╣╠═╝║    ║╣ ║║║╠═╣╠═╣║║║║  ║╣  ║║
-    ╩ ╩╩  ╩═╝  ╚═╝╝╚╝╩ ╩╩ ╩╝╚╝╚═╝╚═╝═╩╝
+    ╩ ╩╩  ╩    ╚═╝╝╚╝╩ ╩╩ ╩╝╚╝╚═╝╚═╝═╩╝
     `)
     logger.info(`
 - Server started successfully @ http://${host ? host : 'localhost'}:${port}
